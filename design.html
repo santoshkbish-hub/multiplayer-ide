@@ -368,6 +368,399 @@
     </div>
   </section>
 
+  <!-- COORDINATION -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-tag">Coordination</span><h2>How agents stay out of each other&rsquo;s way</h2></div>
+    <p class="lead">Two people can each be steering an agent inside the same workspace. The system keeps every agent aware of what the others are doing, lets an agent ask a referee when something might overlap, and pauses cleanly when there is no good automatic answer. Nothing is locked by default &mdash; agents run side by side and only slow down when they actually bump into each other.</p>
+
+    <div class="cards" style="margin-top:18px;">
+      <div class="card">
+        <span class="tag">activity board</span>
+        <h3>Constant awareness</h3>
+        <p>A short summary of every other agent&rsquo;s recent work and current plan is handed to each agent before its next step. It costs the agent nothing to read; it just shows up.</p>
+      </div>
+      <div class="card">
+        <span class="tag">plan note</span>
+        <h3>Say what you&rsquo;re about to do</h3>
+        <p>Before changing files, an agent posts a one-line plan: the goal and which files it expects to touch. Other agents see it on the activity board; the system uses it to spot overlap.</p>
+      </div>
+      <div class="card">
+        <span class="tag">referee</span>
+        <h3>Ask when in doubt</h3>
+        <p>A separate read-only helper that an agent can ask any time it senses overlap. It looks at every active plan note and answers with one of a small set of suggestions.</p>
+      </div>
+    </div>
+
+    <!-- DIAGRAM A: inside an agent's turn -->
+    <div class="canvas" style="margin-top:24px;">
+      <svg viewBox="0 0 720 880" role="img" aria-label="Inside an agent's turn">
+        <defs>
+          <marker id="ca" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#15212B"/></marker>
+          <marker id="cat" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0E8C86"/></marker>
+          <marker id="cag" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#B5710A"/></marker>
+        </defs>
+
+        <text class="zlbl" x="28" y="26" font-size="11">INSIDE ONE AGENT&rsquo;S TURN</text>
+
+        <!-- N1: person asks -->
+        <rect class="nbox" x="180" y="48" width="360" height="46" rx="6"/>
+        <text class="ttl" x="360" y="76" font-size="13" text-anchor="middle">Person asks the agent for a change</text>
+        <path class="edge" d="M360,94 L360,122" marker-end="url(#ca)"/>
+
+        <!-- N2: fresh summary handed in -->
+        <rect class="nbox accent-soft" x="120" y="122" width="480" height="98" rx="6"/>
+        <text class="ttl" x="360" y="146" font-size="12.5" text-anchor="middle">System hands the agent a fresh summary first</text>
+        <text class="sub" x="360" y="166" font-size="10.5" text-anchor="middle">&middot; what every other agent is working on right now</text>
+        <text class="sub" x="360" y="182" font-size="10.5" text-anchor="middle">&middot; any heads-up messages addressed to this agent</text>
+        <text class="sub" x="360" y="198" font-size="10.5" text-anchor="middle">&middot; what was just edited in the workspace</text>
+        <text class="sub" x="360" y="213" font-size="10" text-anchor="middle" font-style="italic">a small block of text, attached automatically</text>
+        <path class="edge" d="M360,220 L360,248" marker-end="url(#ca)"/>
+
+        <!-- N3: agent posts plan -->
+        <rect class="nbox" x="180" y="248" width="360" height="62" rx="6"/>
+        <text class="ttl" x="360" y="272" font-size="12.5" text-anchor="middle">Agent posts a short plan note</text>
+        <text class="sub" x="360" y="290" font-size="10.5" text-anchor="middle">&ldquo;goal: add login button &middot; files: Login.tsx&rdquo;</text>
+        <text class="sub" x="360" y="304" font-size="10" text-anchor="middle" font-style="italic">other agents will see it on their next summary</text>
+        <path class="edge" d="M360,310 L360,338" marker-end="url(#ca)"/>
+
+        <!-- D1: overlap? -->
+        <polygon class="diamond" points="360,338 460,386 360,434 260,386"/>
+        <text class="ttl" x="360" y="382" font-size="11" text-anchor="middle">Anyone else already</text>
+        <text class="ttl" x="360" y="396" font-size="11" text-anchor="middle">claim these files?</text>
+
+        <!-- yes branch out -->
+        <path class="edge" d="M460,386 L548,386" marker-end="url(#ca)"/>
+        <text class="elbl" x="500" y="380" font-size="10" text-anchor="middle">yes</text>
+        <rect class="nbox accent" x="548" y="356" width="156" height="60" rx="6"/>
+        <text class="ttl acc" x="626" y="380" font-size="11.5" text-anchor="middle">Must ask the referee</text>
+        <text class="sub" x="626" y="396" font-size="10" text-anchor="middle">posting blocked until</text>
+        <text class="sub" x="626" y="408" font-size="10" text-anchor="middle">overlap is sorted out</text>
+
+        <!-- no down -->
+        <path class="edge" d="M360,434 L360,464" marker-end="url(#ca)"/>
+        <text class="elbl" x="370" y="454" font-size="10">no</text>
+
+        <!-- LOOP -->
+        <rect class="loopbox" x="60" y="464" width="600" height="260" rx="10"/>
+        <text class="zlbl" x="80" y="486" font-size="11">AGENT WORKS &mdash; many small steps</text>
+
+        <!-- L1: work step -->
+        <rect class="nbox" x="180" y="498" width="360" height="46" rx="6"/>
+        <text class="ttl" x="360" y="526" font-size="12.5" text-anchor="middle">Read &middot; think &middot; edit &middot; run</text>
+        <path class="edge" d="M360,544 L360,568" marker-end="url(#cat)"/>
+
+        <!-- L2: fresh summary between steps -->
+        <rect class="nbox accent-soft" x="100" y="568" width="520" height="60" rx="6"/>
+        <text class="ttl acc" x="360" y="590" font-size="12" text-anchor="middle">Between each batch of actions: a fresh summary arrives</text>
+        <text class="sub" x="360" y="608" font-size="10" text-anchor="middle">new edits by others &middot; new plan notes &middot; heads-up messages addressed to this agent</text>
+        <text class="sub" x="360" y="622" font-size="9.5" text-anchor="middle" font-style="italic">important messages are sorted to the top so they aren&rsquo;t missed</text>
+        <path class="edge" d="M360,628 L360,652" marker-end="url(#ca)"/>
+
+        <!-- D2: heads-up? -->
+        <polygon class="diamond" points="360,652 444,690 360,728 276,690"/>
+        <text class="ttl" x="360" y="686" font-size="11" text-anchor="middle">Heads-up that</text>
+        <text class="ttl" x="360" y="700" font-size="11" text-anchor="middle">overlaps me?</text>
+
+        <!-- yes side branch -->
+        <path class="edge" d="M444,690 L520,690" marker-end="url(#ca)"/>
+        <text class="elbl" x="478" y="684" font-size="10" text-anchor="middle">yes</text>
+        <rect class="nbox accent" x="520" y="662" width="138" height="56" rx="6"/>
+        <text class="ttl acc" x="589" y="686" font-size="11.5" text-anchor="middle">Ask the referee</text>
+        <text class="sub" x="589" y="702" font-size="10" text-anchor="middle">see next diagram</text>
+
+        <!-- no loops back up -->
+        <path class="edge" d="M276,690 C140,690 140,520 178,520" marker-end="url(#ca)"/>
+        <text class="elbl" x="118" y="606" font-size="10" transform="rotate(-90 118 606)">no &mdash; keep going</text>
+
+        <!-- exit loop -->
+        <path class="edge" d="M360,728 L360,752" marker-end="url(#ca)"/>
+
+        <!-- N5: turn ends -->
+        <rect class="nbox" x="180" y="752" width="360" height="44" rx="6"/>
+        <text class="ttl" x="360" y="780" font-size="12.5" text-anchor="middle">Turn ends &middot; plan note marked done</text>
+        <path class="edge" d="M360,796 L360,820" marker-end="url(#cat)"/>
+
+        <!-- N6: broadcast -->
+        <rect class="nbox accent" x="120" y="820" width="480" height="48" rx="6"/>
+        <text class="ttl acc" x="360" y="842" font-size="12.5" text-anchor="middle">Any agent waiting on this plan is woken</text>
+        <text class="sub" x="360" y="860" font-size="10" text-anchor="middle">it picks up its question with a note explaining what just changed</text>
+      </svg>
+    </div>
+
+    <!-- DIAGRAM B: when things might overlap -->
+    <div class="canvas" style="margin-top:24px;">
+      <svg viewBox="0 0 1000 880" role="img" aria-label="When work might overlap">
+        <defs>
+          <marker id="cba" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#15212B"/></marker>
+          <marker id="cbt" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0E8C86"/></marker>
+          <marker id="cbg" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#B5710A"/></marker>
+        </defs>
+
+        <text class="zlbl" x="28" y="26" font-size="11">WHEN WORK MIGHT OVERLAP &mdash; ASK, ANSWER, ACT</text>
+
+        <!-- top: agent asks -->
+        <rect class="nbox" x="320" y="50" width="360" height="68" rx="6"/>
+        <text class="ttl" x="500" y="76" font-size="12.5" text-anchor="middle">Agent sends the referee a short question</text>
+        <text class="sub" x="500" y="94" font-size="10.5" text-anchor="middle">&ldquo;I want to do X. I noticed someone else doing Y.</text>
+        <text class="sub" x="500" y="108" font-size="10.5" text-anchor="middle">What should I do?&rdquo;</text>
+        <path class="edge" d="M500,118 L500,142" marker-end="url(#cba)"/>
+
+        <!-- referee box -->
+        <rect class="nbox accent" x="240" y="142" width="520" height="110" rx="6"/>
+        <text class="ttl acc" x="500" y="170" font-size="14" text-anchor="middle">REFEREE</text>
+        <text class="sub" x="500" y="190" font-size="10.5" text-anchor="middle">a separate helper that only reads &mdash; never edits files</text>
+        <text class="sub" x="500" y="208" font-size="10.5" text-anchor="middle">reads every active plan note &middot; recent edits &middot; its own past answers</text>
+        <text class="sub" x="500" y="226" font-size="10.5" text-anchor="middle">decides quickly: usually well under a couple of seconds</text>
+        <text class="sub" x="500" y="244" font-size="9.5" text-anchor="middle" font-style="italic">a person can also step in and answer the same question if they want</text>
+        <path class="edge" d="M500,252 L500,278" marker-end="url(#cba)"/>
+
+        <!-- answer label -->
+        <text class="zlbl" x="500" y="292" font-size="11" text-anchor="middle">REFEREE ANSWERS ONE OF FIVE WAYS</text>
+
+        <!-- 5 outcome boxes side by side -->
+        <!-- A1: clear -->
+        <rect class="nbox accent-soft" x="36" y="312" width="178" height="80" rx="6"/>
+        <text class="ttl acc" x="125" y="338" font-size="12" text-anchor="middle">Go ahead</text>
+        <text class="sub" x="125" y="356" font-size="10" text-anchor="middle">no real overlap</text>
+        <text class="sub" x="125" y="370" font-size="10" text-anchor="middle">proceed as planned</text>
+
+        <!-- A2: try scope -->
+        <rect class="nbox accent-soft" x="224" y="312" width="178" height="80" rx="6"/>
+        <text class="ttl acc" x="313" y="338" font-size="12" text-anchor="middle">Try this scope</text>
+        <text class="sub" x="313" y="356" font-size="10" text-anchor="middle">narrow your plan:</text>
+        <text class="sub" x="313" y="370" font-size="10" text-anchor="middle">&ldquo;you take A, peer B&rdquo;</text>
+
+        <!-- A3: partial clear -->
+        <rect class="nbox accent-soft" x="412" y="312" width="178" height="80" rx="6"/>
+        <text class="ttl acc" x="501" y="334" font-size="12" text-anchor="middle">Do this part now,</text>
+        <text class="ttl acc" x="501" y="348" font-size="12" text-anchor="middle">defer the rest</text>
+        <text class="sub" x="501" y="365" font-size="10" text-anchor="middle">work on what&rsquo;s free</text>
+        <text class="sub" x="501" y="378" font-size="10" text-anchor="middle">come back for the rest</text>
+
+        <!-- A4: step aside -->
+        <rect class="nbox accent" x="600" y="312" width="178" height="80" rx="6"/>
+        <text class="ttl acc" x="689" y="338" font-size="12" text-anchor="middle">Step aside for now</text>
+        <text class="sub" x="689" y="356" font-size="10" text-anchor="middle">wait until peer is done</text>
+        <text class="sub" x="689" y="370" font-size="10" text-anchor="middle">system will wake you</text>
+
+        <!-- A5: ask the people -->
+        <rect class="nbox guard" x="788" y="312" width="178" height="80" rx="6"/>
+        <text class="ttl gd" x="877" y="338" font-size="12" text-anchor="middle">Ask the people</text>
+        <text class="sub" x="877" y="356" font-size="10" text-anchor="middle">looks like the same</text>
+        <text class="sub" x="877" y="370" font-size="10" text-anchor="middle">request two people made</text>
+
+        <!-- arrows from referee to the five -->
+        <path class="edge" d="M500,278 L125,308" marker-end="url(#cba)" opacity="0.6"/>
+        <path class="edge" d="M500,278 L313,308" marker-end="url(#cba)" opacity="0.6"/>
+        <path class="edge" d="M500,278 L501,308" marker-end="url(#cba)" opacity="0.6"/>
+        <path class="edge" d="M500,278 L689,308" marker-end="url(#cba)" opacity="0.6"/>
+        <path class="edge-gd" d="M500,278 L877,308" marker-end="url(#cbg)" opacity="0.7"/>
+
+        <!-- arrows down from each outcome -->
+        <path class="edge" d="M125,392 L125,420" marker-end="url(#cba)"/>
+        <path class="edge" d="M313,392 L313,420" marker-end="url(#cba)"/>
+        <path class="edge" d="M501,392 L501,420" marker-end="url(#cba)"/>
+        <path class="edge" d="M689,392 L689,420" marker-end="url(#cba)"/>
+        <path class="edge-gd" d="M877,392 L877,420" marker-end="url(#cbg)"/>
+
+        <!-- consequence boxes -->
+        <rect class="nbox" x="36" y="420" width="178" height="64" rx="6"/>
+        <text class="sub" x="125" y="442" font-size="10" text-anchor="middle">Agent keeps its plan</text>
+        <text class="sub" x="125" y="456" font-size="10" text-anchor="middle">note and continues</text>
+        <text class="sub" x="125" y="470" font-size="10" text-anchor="middle">working</text>
+
+        <rect class="nbox" x="224" y="420" width="178" height="64" rx="6"/>
+        <text class="sub" x="313" y="442" font-size="10" text-anchor="middle">Agent updates its plan</text>
+        <text class="sub" x="313" y="456" font-size="10" text-anchor="middle">to the narrower scope,</text>
+        <text class="sub" x="313" y="470" font-size="10" text-anchor="middle">continues</text>
+
+        <rect class="nbox accent-soft" x="412" y="420" width="178" height="64" rx="6"/>
+        <text class="sub" x="501" y="442" font-size="10" text-anchor="middle">Agent works the free part,</text>
+        <text class="sub" x="501" y="456" font-size="10" text-anchor="middle">then steps aside on the</text>
+        <text class="sub" x="501" y="470" font-size="10" text-anchor="middle">rest &mdash; see panel below</text>
+
+        <rect class="nbox accent-soft" x="600" y="420" width="178" height="64" rx="6"/>
+        <text class="sub" x="689" y="442" font-size="10" text-anchor="middle">Agent ends its turn</text>
+        <text class="sub" x="689" y="456" font-size="10" text-anchor="middle">cleanly &mdash; see</text>
+        <text class="sub" x="689" y="470" font-size="10" text-anchor="middle">panel below</text>
+
+        <rect class="nbox guard" x="788" y="420" width="178" height="64" rx="6"/>
+        <text class="sub" x="877" y="442" font-size="10" text-anchor="middle">Both agents pause</text>
+        <text class="sub" x="877" y="456" font-size="10" text-anchor="middle">together &mdash; see</text>
+        <text class="sub" x="877" y="470" font-size="10" text-anchor="middle">panel below</text>
+
+        <!-- STEP ASIDE PANEL -->
+        <rect class="loopbox" x="36" y="510" width="460" height="330" rx="10"/>
+        <text class="zlbl" x="56" y="532" font-size="11">STEP ASIDE &mdash; HOW WAITING WORKS</text>
+
+        <!-- step 1 -->
+        <rect class="nbox" x="72" y="548" width="386" height="50" rx="6"/>
+        <text class="ttl" x="265" y="572" font-size="12" text-anchor="middle">Agent tells the system: &ldquo;pause my turn&rdquo;</text>
+        <text class="sub" x="265" y="588" font-size="10" text-anchor="middle">&middot; until plan X finishes &middot; or up to N minutes &middot;</text>
+        <path class="edge" d="M265,598 L265,618" marker-end="url(#cba)"/>
+
+        <!-- step 2: split -->
+        <rect class="nbox" x="72" y="618" width="184" height="62" rx="6"/>
+        <text class="ttl" x="164" y="640" font-size="11.5" text-anchor="middle">User&rsquo;s screen shows:</text>
+        <text class="sub" x="164" y="656" font-size="10" text-anchor="middle">&ldquo;paused, waiting on</text>
+        <text class="sub" x="164" y="670" font-size="10" text-anchor="middle">Alice&rsquo;s refactor&rdquo;</text>
+
+        <rect class="nbox accent-soft" x="274" y="618" width="184" height="62" rx="6"/>
+        <text class="ttl" x="366" y="640" font-size="11.5" text-anchor="middle">Meanwhile</text>
+        <text class="sub" x="366" y="656" font-size="10" text-anchor="middle">other agent keeps working</text>
+        <text class="sub" x="366" y="670" font-size="10" text-anchor="middle">and eventually finishes</text>
+
+        <path class="edge" d="M164,680 L164,700" marker-end="url(#cba)"/>
+        <path class="edge" d="M366,680 L366,700" marker-end="url(#cba)"/>
+
+        <!-- step 3 -->
+        <rect class="nbox accent" x="72" y="700" width="386" height="52" rx="6"/>
+        <text class="ttl acc" x="265" y="722" font-size="12" text-anchor="middle">System notices the awaited plan is done</text>
+        <text class="sub" x="265" y="740" font-size="10" text-anchor="middle">it prepares a small note about what changed</text>
+        <path class="edge" d="M265,752 L265,772" marker-end="url(#cbt)"/>
+
+        <!-- step 4 -->
+        <rect class="nbox accent" x="72" y="772" width="386" height="58" rx="6"/>
+        <text class="ttl acc" x="265" y="792" font-size="12" text-anchor="middle">Agent&rsquo;s turn picks back up</text>
+        <text class="sub" x="265" y="810" font-size="10" text-anchor="middle">the note rides on top of its next view &mdash;</text>
+        <text class="sub" x="265" y="823" font-size="10" text-anchor="middle">&ldquo;you were waiting on X; X is done; here&rsquo;s what changed&rdquo;</text>
+
+        <!-- ESCALATION PANEL -->
+        <rect class="loopbox" x="528" y="510" width="448" height="330" rx="10" stroke="#B5710A" style="fill:rgba(181,113,10,.04)"/>
+        <text class="zlbl" x="548" y="532" font-size="11" fill="#B5710A">ASK THE PEOPLE &mdash; WHEN TWO USERS WANT THE SAME THING</text>
+
+        <!-- step 1 -->
+        <rect class="nbox guard" x="564" y="548" width="376" height="56" rx="6"/>
+        <text class="ttl gd" x="752" y="572" font-size="12" text-anchor="middle">Both agents stop politely, mid-step</text>
+        <text class="sub" x="752" y="590" font-size="10" text-anchor="middle">they don&rsquo;t race each other to finish</text>
+        <path class="edge-gd" d="M752,604 L752,624" marker-end="url(#cbg)"/>
+
+        <!-- step 2 -->
+        <rect class="nbox" x="564" y="624" width="376" height="64" rx="6"/>
+        <text class="ttl" x="752" y="646" font-size="12" text-anchor="middle">Both chats show the same prompt to their user</text>
+        <text class="sub" x="752" y="664" font-size="10" text-anchor="middle">&ldquo;You and Bob both asked to add a login button.</text>
+        <text class="sub" x="752" y="678" font-size="10" text-anchor="middle">Who owns this? Combine, or pick one.&rdquo;</text>
+        <path class="edge-gd" d="M752,688 L752,708" marker-end="url(#cbg)"/>
+
+        <!-- step 3 -->
+        <rect class="nbox" x="564" y="708" width="376" height="50" rx="6"/>
+        <text class="ttl" x="752" y="732" font-size="12" text-anchor="middle">Either person picks a winner</text>
+        <text class="sub" x="752" y="748" font-size="10" text-anchor="middle">no need to wait on a moderator</text>
+        <path class="edge-gd" d="M752,758 L752,778" marker-end="url(#cbg)"/>
+
+        <!-- step 4 -->
+        <rect class="nbox accent" x="564" y="778" width="376" height="52" rx="6"/>
+        <text class="ttl acc" x="752" y="800" font-size="12" text-anchor="middle">Winner&rsquo;s agent resumes; loser&rsquo;s chat is told</text>
+        <text class="sub" x="752" y="818" font-size="10" text-anchor="middle">the loser&rsquo;s plan note is dropped or merged into the winner&rsquo;s</text>
+
+      </svg>
+    </div>
+
+    <h3 style="font-family:var(--disp);font-weight:500;font-size:1.15rem;letter-spacing:-.01em;margin:36px 0 6px;">Behind the scenes &mdash; who fires what</h3>
+    <p class="lead">Three actors split the work. None of them watches all of it &mdash; that&rsquo;s on purpose. Agents stay parallel because nobody is sitting between them deciding what they can do.</p>
+
+    <div class="cards" style="margin-top:18px;">
+      <div class="card">
+        <span class="tag">per-chat agent</span>
+        <h3>Runs only while you&rsquo;re prompting it</h3>
+        <p>Posts plans and messages, asks the referee when something might overlap. When it steps aside, nothing is running on its side &mdash; the question is held until the wait is over. It never polls or schedules itself.</p>
+      </div>
+      <div class="card">
+        <span class="tag">referee</span>
+        <h3>Only thinks when asked</h3>
+        <p>Reads the board, weighs the open plan notes, returns one of the five answers, then goes idle. Doesn&rsquo;t watch agents, doesn&rsquo;t push messages. A person can step in and answer in the referee&rsquo;s place at any moment.</p>
+      </div>
+      <div class="card">
+        <span class="tag">always-on watcher</span>
+        <h3>Notices when things finish</h3>
+        <p>The one piece always listening. When a turn ends, when a plan is marked done, when files are written &mdash; the watcher reacts. When a paused agent&rsquo;s wait just resolved, this is what wakes it &mdash; with a short note explaining what changed.</p>
+      </div>
+    </div>
+
+    <!-- WAKE-UP CYCLE DIAGRAM -->
+    <div class="canvas" style="margin-top:24px;">
+      <svg viewBox="0 0 1000 320" role="img" aria-label="How a paused agent gets woken back up">
+        <defs>
+          <marker id="wa" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#15212B"/></marker>
+          <marker id="wat" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0E8C86"/></marker>
+        </defs>
+
+        <text class="zlbl" x="28" y="26" font-size="11">THE WAKE-UP CYCLE &mdash; HOW A PAUSED AGENT GETS BROUGHT BACK</text>
+
+        <!-- four columns -->
+        <!-- col 1: paused agent -->
+        <rect class="nbox" x="32" y="56" width="216" height="220" rx="8" opacity="0.55"/>
+        <text class="ttl" x="140" y="84" font-size="12" text-anchor="middle">Paused agent</text>
+        <text class="sub" x="140" y="106" font-size="10" text-anchor="middle">turn ended cleanly</text>
+        <text class="sub" x="140" y="122" font-size="10" text-anchor="middle">said: &ldquo;wake me when</text>
+        <text class="sub" x="140" y="136" font-size="10" text-anchor="middle">Alice&rsquo;s plan finishes&rdquo;</text>
+        <rect x="64" y="160" width="152" height="32" rx="4" fill="#EBEEF2" stroke="#D2DAE1"/>
+        <text class="sub" x="140" y="180" font-size="10" text-anchor="middle" font-style="italic">user sees: paused</text>
+        <text class="sub" x="140" y="216" font-size="9.5" text-anchor="middle">nothing running</text>
+        <text class="sub" x="140" y="230" font-size="9.5" text-anchor="middle">on its side</text>
+        <text class="sub" x="140" y="252" font-size="9.5" text-anchor="middle" font-style="italic">not polling, not waiting</text>
+        <text class="sub" x="140" y="266" font-size="9.5" text-anchor="middle" font-style="italic">in a loop &mdash; just stopped</text>
+
+        <!-- arrow 1 -->
+        <path class="edge" d="M256,166 L296,166" marker-end="url(#wa)"/>
+        <text class="elbl" x="276" y="158" font-size="9.5" text-anchor="middle">meanwhile</text>
+
+        <!-- col 2: other agent finishes -->
+        <rect class="nbox" x="304" y="56" width="216" height="220" rx="8"/>
+        <text class="ttl" x="412" y="84" font-size="12" text-anchor="middle">Alice&rsquo;s agent</text>
+        <text class="sub" x="412" y="106" font-size="10" text-anchor="middle">keeps working</text>
+        <text class="sub" x="412" y="120" font-size="10" text-anchor="middle">in parallel</text>
+        <path d="M340,140 L484,140" stroke="#D2DAE1" stroke-width="1" stroke-dasharray="3 3"/>
+        <text class="sub" x="412" y="160" font-size="10" text-anchor="middle">eventually finishes</text>
+        <text class="sub" x="412" y="174" font-size="10" text-anchor="middle">last edit, last note</text>
+        <rect class="nbox accent-soft" x="332" y="194" width="160" height="64" rx="5"/>
+        <text class="ttl acc" x="412" y="214" font-size="11" text-anchor="middle">turn ends</text>
+        <text class="sub" x="412" y="232" font-size="9.5" text-anchor="middle">plan note marked done</text>
+        <text class="sub" x="412" y="246" font-size="9.5" text-anchor="middle">&ldquo;finished, here&rsquo;s diff&rdquo;</text>
+
+        <!-- arrow 2 -->
+        <path class="edge-mt" d="M528,166 L568,166" marker-end="url(#wat)"/>
+        <text class="elbl" x="548" y="158" font-size="9.5" text-anchor="middle" fill="#0B6E6B">notice</text>
+
+        <!-- col 3: watcher -->
+        <rect class="nbox accent" x="576" y="56" width="216" height="220" rx="8"/>
+        <text class="ttl acc" x="684" y="84" font-size="12" text-anchor="middle">Watcher</text>
+        <text class="sub" x="684" y="106" font-size="10" text-anchor="middle">sees Alice&rsquo;s plan</text>
+        <text class="sub" x="684" y="120" font-size="10" text-anchor="middle">went to &ldquo;done&rdquo;</text>
+        <text class="sub" x="684" y="148" font-size="10" text-anchor="middle">checks: is anyone</text>
+        <text class="sub" x="684" y="162" font-size="10" text-anchor="middle">waiting for this?</text>
+        <text class="sub" x="684" y="186" font-size="10" text-anchor="middle">yes &mdash; the paused agent</text>
+        <rect class="nbox accent-soft" x="604" y="206" width="160" height="50" rx="5"/>
+        <text class="sub" x="684" y="226" font-size="9.5" text-anchor="middle">prepares a small note:</text>
+        <text class="sub" x="684" y="240" font-size="9.5" text-anchor="middle">&ldquo;what just changed&rdquo;</text>
+
+        <!-- arrow 3 -->
+        <path class="edge-mt" d="M800,166 L840,166" marker-end="url(#wat)"/>
+        <text class="elbl" x="820" y="158" font-size="9.5" text-anchor="middle" fill="#0B6E6B">wake</text>
+
+        <!-- col 4: agent resumes -->
+        <rect class="nbox accent" x="848" y="56" width="148" height="220" rx="8"/>
+        <text class="ttl acc" x="922" y="84" font-size="12" text-anchor="middle">Agent resumes</text>
+        <text class="sub" x="922" y="108" font-size="10" text-anchor="middle">question picked up</text>
+        <text class="sub" x="922" y="122" font-size="10" text-anchor="middle">from where it paused</text>
+        <text class="sub" x="922" y="148" font-size="10" text-anchor="middle">note rides on top:</text>
+        <text class="sub" x="922" y="166" font-size="9.5" text-anchor="middle" font-style="italic">&ldquo;Alice&rsquo;s plan</text>
+        <text class="sub" x="922" y="178" font-size="9.5" text-anchor="middle" font-style="italic">finished &mdash; here&rsquo;s</text>
+        <text class="sub" x="922" y="190" font-size="9.5" text-anchor="middle" font-style="italic">what changed&rdquo;</text>
+        <text class="sub" x="922" y="216" font-size="10" text-anchor="middle">re-reads the workspace,</text>
+        <text class="sub" x="922" y="230" font-size="10" text-anchor="middle">plans against new state,</text>
+        <text class="sub" x="922" y="244" font-size="10" text-anchor="middle">continues</text>
+
+        <!-- bottom note -->
+        <text class="note" x="500" y="304" font-size="10.5" text-anchor="middle">The agent itself never decides &ldquo;is it my turn yet?&rdquo; &mdash; the watcher does that and brings it back.</text>
+      </svg>
+    </div>
+
+    <p class="lead" style="margin-top:18px;">The agent never decides &ldquo;is it my turn yet?&rdquo; &mdash; while paused, it isn&rsquo;t doing anything. The watcher notices the wait condition resolving and re-fires the agent&rsquo;s question with a wake-up note. The referee is never in the loop for wake-ups; it only gets asked when the agent itself wants advice. The channels are kept to the minimum that works: agent &harr; board (passive memory), agent &harr; agent (direct messages), agent &rarr; referee (asked questions), watcher &rarr; agent (wake-ups). Anything else would mean a long-running brain holding the system together, which is exactly what this design avoids.</p>
+
+    <p class="lead" style="margin-top:18px;">A few things to keep in mind from the diagrams above. Agents are <span class="ink">not</span> serialized by default &mdash; two people prompting at the same moment both start working immediately. The only time work pauses is when an agent itself decides to step aside, or when two people are clearly asking for the same thing. Awareness arrives passively, between every batch of actions, so an agent doesn&rsquo;t have to remember to check. And resuming a paused turn is never blind: the wake-up always comes with a short note explaining what changed while the agent was away.</p>
+  </section>
+
   <!-- FLOW -->
   <section class="reveal">
     <div class="sec-head"><span class="sec-tag">Flow</span><h2>How work moves through the system</h2></div>
