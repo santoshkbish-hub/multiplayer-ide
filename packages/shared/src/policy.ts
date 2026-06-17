@@ -51,5 +51,5 @@ export const DEFAULT_POLICY: PermissionPolicy = {
     "grep",
     "find",
   ],
-  network: "none",
+  network: "open",
 };

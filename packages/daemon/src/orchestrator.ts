@@ -714,6 +714,10 @@ export class Orchestrator {
     const prompt = pending.find((p) => p.prompt_id === sub.prompt_id);
     if (!prompt) return;
 
+    const session = this.sm.getSession(ev.session_id);
+    const preTurnHead =
+      session?.worktree_path ? this.gm.headSha(session.worktree_path) : null;
+
     // Accumulate every user-visible token from this turn so we can replay it
     // when a client reconnects. Stored as one chat row with user_id="agent"
     // and JSON-encoded chunks so the browser can re-dispatch each chunk
@@ -760,14 +764,19 @@ export class Orchestrator {
         );
       }
     });
-    this.appendAgentStatus(
-      ev.session_id,
-      ev.capability.user_id,
-      chatId,
-      "checkpoint",
-      `checkpoint ${result.checkpoint_sha.slice(0, 8)} after prompt`,
-    );
-    emitAndRecord(`[checkpoint ${result.checkpoint_sha.slice(0, 8)}]`);
+    // Only mark a checkpoint when the turn actually advanced HEAD. Text-only
+    // turns leave the worktree untouched and would otherwise emit a marker
+    // that re-states the existing SHA — pure noise in the transcript.
+    if (result.checkpoint_sha !== preTurnHead) {
+      this.appendAgentStatus(
+        ev.session_id,
+        ev.capability.user_id,
+        chatId,
+        "checkpoint",
+        `checkpoint ${result.checkpoint_sha.slice(0, 8)} after prompt`,
+      );
+      emitAndRecord(`[checkpoint ${result.checkpoint_sha.slice(0, 8)}]`);
+    }
 
     if (assistantBuf.length > 0) {
       this.chat.append(

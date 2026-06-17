@@ -26,7 +26,10 @@ export async function startRelay(opts: RelayOptions): Promise<RelayHandle> {
   const http = createServer();
   const io = new IOServer(http, {
     cors: { origin: "*" },
-    maxHttpBufferSize: 64 * 1024,
+    // Replay bundles can grow with chat history (assistant turns are persisted
+    // as JSON arrays of token chunks). 4 MB gives ample headroom without
+    // opening us up to the socket.io default 100 MB.
+    maxHttpBufferSize: 4 * 1024 * 1024,
   });
 
   io.use(makeAuthMiddleware({ hostToken: opts.hostToken, inviteTokens }));
