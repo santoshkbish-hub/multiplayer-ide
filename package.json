@@ -1,0 +1,29 @@
+{
+  "name": "multiplayer-ide",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "packages/relay",
+    "packages/daemon",
+    "packages/client"
+  ],
+  "scripts": {
+    "build": "tsc -b packages/shared packages/relay packages/daemon",
+    "build:shared": "tsc -b packages/shared",
+    "build:relay": "tsc -b packages/relay",
+    "build:daemon": "tsc -b packages/daemon",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "start": "bash scripts/run.sh",
+    "start:relay": "node packages/relay/dist/index.js",
+    "start:daemon": "node packages/daemon/dist/index.js",
+    "start:client": "node packages/client/server.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

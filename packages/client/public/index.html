@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>collab</title>
+    <style>
+      :root { color-scheme: light dark; }
+      * { box-sizing: border-box; }
+      body {
+        font: 15px/1.5 system-ui, -apple-system, sans-serif;
+        margin: 0;
+        height: 100vh;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        background: #0f1115;
+        color: #d8dde6;
+      }
+      #workspace {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        overflow: hidden;
+        min-height: 0;
+      }
+      #side {
+        border-right: 1px solid #232830;
+        display: grid;
+        grid-template-rows: 1fr 1fr;
+        min-height: 0;
+      }
+      #files, #viewer {
+        overflow: auto;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 12px;
+      }
+      #files { border-bottom: 1px solid #232830; }
+      .pane-head {
+        padding: 6px 10px;
+        color: #94a0b8;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        position: sticky;
+        top: 0;
+        background: #0f1115;
+        border-bottom: 1px solid #232830;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .pane-head button {
+        background: transparent;
+        color: #94a0b8;
+        border: 1px solid #2a3140;
+        border-radius: 4px;
+        padding: 1px 6px;
+        cursor: pointer;
+        font: inherit;
+      }
+      .pane-head button:hover { color: #d8dde6; border-color: #4ade80; }
+      .file-row {
+        padding: 3px 12px;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .file-row:hover { background: #182230; }
+      .file-row.active { background: #1c2230; color: #4ade80; }
+      .file-row .mode { color: #6c7280; margin-right: 6px; font-size: 10px; }
+      .file-row .size { color: #6c7280; float: right; }
+      #viewer pre {
+        margin: 0;
+        padding: 10px 12px;
+        white-space: pre;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      #viewer .empty {
+        padding: 20px 12px;
+        color: #6c7280;
+        font-style: italic;
+        font-family: system-ui, sans-serif;
+      }
+      #main {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+      }
+      header {
+        padding: 10px 16px;
+        border-bottom: 1px solid #232830;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      header h1 { font-size: 14px; margin: 0; font-weight: 600; }
+      header .who { font-size: 13px; color: #94a0b8; }
+      header .status { margin-left: auto; font-size: 12px; color: #94a0b8; }
+      header .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #6c7280; margin-right: 6px; vertical-align: middle; }
+      header.connected .dot { background: #4ade80; }
+      header.error .dot { background: #ef4444; }
+
+      #transcript {
+        flex: 1;
+        overflow: auto;
+        padding: 16px;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 13px;
+        white-space: pre-wrap;
+      }
+      .msg { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; }
+      .msg.user { background: #1c2230; }
+      .msg.assistant { background: #182230; border-left: 3px solid #4ade80; }
+      .msg.system { color: #94a0b8; font-style: italic; padding: 4px 12px; }
+      .msg.system .tool {
+        background: #141a26;
+        border: 1px solid #232830;
+        border-radius: 6px;
+        padding: 0;
+        font-style: normal;
+        overflow: hidden;
+      }
+      .tool summary {
+        cursor: pointer;
+        padding: 6px 10px;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        user-select: none;
+      }
+      .tool summary::-webkit-details-marker { display: none; }
+      .tool summary::before {
+        content: "▸";
+        color: #6c7280;
+        font-size: 10px;
+        width: 8px;
+        display: inline-block;
+      }
+      .tool[open] summary::before { content: "▾"; }
+      .tool-name { color: #d8dde6; font-weight: 600; }
+      .tool-arg { color: #94a0b8; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+      .tool-status { margin-left: auto; font-size: 11px; padding: 1px 6px; border-radius: 3px; }
+      .tool-status.pending { background: #2a3140; color: #94a0b8; }
+      .tool-status.ok { background: #134e3a; color: #4ade80; }
+      .tool-status.err { background: #4a1d1d; color: #ef4444; }
+      .tool-body {
+        margin: 0;
+        padding: 8px 10px;
+        background: #0f1115;
+        border-top: 1px solid #232830;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #d8dde6;
+        max-height: 320px;
+        overflow: auto;
+      }
+      .msg .who { font-size: 11px; color: #94a0b8; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+      footer {
+        padding: 12px 16px;
+        border-top: 1px solid #232830;
+        display: flex;
+        gap: 8px;
+      }
+      footer textarea {
+        flex: 1;
+        resize: none;
+        background: #1c2230;
+        color: #d8dde6;
+        border: 1px solid #2a3140;
+        border-radius: 6px;
+        padding: 8px 10px;
+        font: inherit;
+        min-height: 56px;
+        max-height: 200px;
+      }
+      footer button {
+        background: #4ade80;
+        color: #0f1115;
+        border: 0;
+        border-radius: 6px;
+        padding: 0 18px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      footer button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+      /* gate */
+      #gate {
+        position: fixed;
+        inset: 0;
+        background: #0f1115;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+        padding: 24px;
+      }
+      #gate .card {
+        background: #1c2230;
+        padding: 28px;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 560px;
+      }
+      #gate h2 { margin: 0 0 6px; font-size: 18px; }
+      #gate p { color: #94a0b8; margin: 0 0 18px; font-size: 13px; }
+      #gate input {
+        width: 100%;
+        background: #0f1115;
+        color: #d8dde6;
+        border: 1px solid #2a3140;
+        border-radius: 6px;
+        padding: 10px 12px;
+        font: inherit;
+        margin-bottom: 12px;
+      }
+      #gate button {
+        background: #4ade80;
+        color: #0f1115;
+        border: 0;
+        border-radius: 6px;
+        padding: 10px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #join { width: 100%; }
+      #sessionPanel {
+        margin-top: 18px;
+        border-top: 1px solid #2a3140;
+        padding-top: 16px;
+      }
+      .session-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .session-actions button.secondary,
+      .session-row button.secondary {
+        background: transparent;
+        color: #d8dde6;
+        border: 1px solid #2a3140;
+      }
+      #sessionList {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 320px;
+        overflow: auto;
+      }
+      .session-row {
+        border: 1px solid #2a3140;
+        border-radius: 6px;
+        padding: 10px;
+        display: grid;
+        gap: 8px;
+      }
+      .session-main {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        min-width: 0;
+      }
+      .session-id {
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 12px;
+        color: #d8dde6;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .session-meta {
+        color: #94a0b8;
+        font-size: 12px;
+      }
+      .row-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      #gate .err { color: #ef4444; font-size: 12px; min-height: 1em; margin: 6px 0 0; }
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <div id="gate">
+      <div class="card">
+        <h2>collab</h2>
+        <p>Pick a name. Then join an active session or start a new one. Existing chats for a session reopen with the same chat id.</p>
+        <input id="name" placeholder="e.g. alice" autocomplete="off" autofocus maxlength="32" />
+        <button id="join">continue</button>
+        <section id="sessionPanel" class="hidden">
+          <div class="session-actions">
+            <button id="newSession">start new session</button>
+            <button id="reloadSessions" class="secondary">refresh</button>
+          </div>
+          <div id="sessionList"></div>
+        </section>
+        <p class="err" id="gateErr"></p>
+      </div>
+    </div>
+
+    <header id="header">
+      <span class="dot"></span>
+      <h1>collab</h1>
+      <span class="who" id="who"></span>
+      <span class="status" id="status">connecting…</span>
+    </header>
+    <div id="workspace">
+      <aside id="side">
+        <section id="files">
+          <div class="pane-head">
+            <span>files</span>
+            <button id="refreshFiles" title="refresh">↻</button>
+          </div>
+          <div id="fileList"></div>
+        </section>
+        <section id="viewer">
+          <div class="pane-head"><span id="viewerPath">no file selected</span></div>
+          <div id="viewerBody"><div class="empty">click a file to preview</div></div>
+        </section>
+      </aside>
+      <main id="main">
+        <div id="transcript"></div>
+      </main>
+    </div>
+    <footer>
+      <textarea id="prompt" placeholder="ask anything — e.g. add a function adder(a,b) to src/foo.ts" rows="2"></textarea>
+      <button id="send" disabled>send</button>
+    </footer>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

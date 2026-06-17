@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.tsbuildinfo
+data/
+worktrees/
+.local-collab/
+.DS_Store
