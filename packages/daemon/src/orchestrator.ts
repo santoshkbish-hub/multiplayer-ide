@@ -714,6 +714,13 @@ export class Orchestrator {
     const prompt = pending.find((p) => p.prompt_id === sub.prompt_id);
     if (!prompt) return;
 
+    // Accumulate every user-visible token from this turn so we can replay it
+    // when a client reconnects. Stored as one chat row with user_id="agent"
+    // and JSON-encoded chunks so the browser can re-dispatch each chunk
+    // through the same agent.token handler it uses live (including tool
+    // tiles, not just plain text).
+    const assistantBuf: string[] = [];
+
     const emit = (data: string, done = false) => {
       const tok: AgentToken = {
         type: "agent.token",
@@ -725,11 +732,15 @@ export class Orchestrator {
       };
       this.relay.emit(tok);
     };
+    const emitAndRecord = (data: string, done = false) => {
+      assistantBuf.push(data);
+      emit(data, done);
+    };
 
     const result = await this.loop.runOne(ev.session_id, prompt, (e) => {
       // edit/command events are internal signalling only — the user-facing
       // tool_use/tool_result tile already carries that info with real status.
-      if (e.kind === "token") emit(e.data);
+      if (e.kind === "token") emitAndRecord(e.data);
       else if (e.kind === "done") emit("[done]", true);
       else if (e.kind === "edit") {
         this.appendAgentStatus(
@@ -756,7 +767,16 @@ export class Orchestrator {
       "checkpoint",
       `checkpoint ${result.checkpoint_sha.slice(0, 8)} after prompt`,
     );
-    emit(`[checkpoint ${result.checkpoint_sha.slice(0, 8)}]`);
+    emitAndRecord(`[checkpoint ${result.checkpoint_sha.slice(0, 8)}]`);
+
+    if (assistantBuf.length > 0) {
+      this.chat.append(
+        ev.session_id,
+        "agent",
+        JSON.stringify(assistantBuf),
+        chatId,
+      );
+    }
   }
 
   private async handleCommand(ev: CommandRequest): Promise<void> {

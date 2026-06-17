@@ -1,4 +1,8 @@
 import { io } from "/socket.io.esm.min.js";
+import {
+  Folder as FtFolder,
+  File as FtFile,
+} from "https://cdn.jsdelivr.net/npm/@webreflection/file-tree@0.1.5/prod.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -37,6 +41,22 @@ function setStatus(text, kind = "") {
   if (kind) els.header.classList.add(kind);
 }
 
+// Render markdown into the body. Falls back to plain text if the markdown
+// library failed to load (e.g. offline LAN with no CDN reachability). The
+// raw text is also stashed on the element so streaming chunks can re-render
+// the whole bubble from accumulated source.
+function renderMarkdownInto(el, raw) {
+  el.dataset.raw = raw;
+  const m = window.marked;
+  const p = window.DOMPurify;
+  if (m && p && typeof m.parse === "function" && typeof p.sanitize === "function") {
+    const html = m.parse(raw, { breaks: true, gfm: true });
+    el.innerHTML = p.sanitize(html);
+  } else {
+    el.textContent = raw;
+  }
+}
+
 function append({ kind, who, text }) {
   const div = document.createElement("div");
   div.className = `msg ${kind}`;
@@ -48,7 +68,11 @@ function append({ kind, who, text }) {
   }
   const body = document.createElement("div");
   body.className = "body";
-  body.textContent = text ?? "";
+  if (kind === "user" || kind === "assistant") {
+    renderMarkdownInto(body, text ?? "");
+  } else {
+    body.textContent = text ?? "";
+  }
   div.appendChild(body);
   els.transcript.appendChild(div);
   els.transcript.scrollTop = els.transcript.scrollHeight;
@@ -145,7 +169,8 @@ function startAssistantBubble() {
 
 function appendToAssistant(chunk) {
   if (!currentAssistantEl) startAssistantBubble();
-  currentAssistantEl.textContent += chunk;
+  const next = (currentAssistantEl.dataset.raw ?? "") + chunk;
+  renderMarkdownInto(currentAssistantEl, next);
   els.transcript.scrollTop = els.transcript.scrollHeight;
 }
 
@@ -323,26 +348,7 @@ function connect() {
     switch (ev.type) {
       case "agent.token": {
         if (!isCurrentChatEvent(ev)) return;
-        const t = ev.data ?? "";
-        if (t.startsWith("[checkpoint")) {
-          appendSystem(t);
-          finishAssistantBubble();
-        } else if (t === "[done]") {
-          finishAssistantBubble();
-        } else if (t.startsWith("[tool_use:")) {
-          appendToolUse(t);
-        } else if (t.startsWith("[tool_result:")) {
-          appendToolResult(t);
-        } else if (
-          t.startsWith("[edit ") ||
-          t.startsWith("[cmd ") ||
-          t.startsWith("[tool ")
-        ) {
-          // legacy back-compat (scripted agent path)
-          appendSystem(t);
-        } else {
-          appendToAssistant(t);
-        }
+        dispatchAgentChunk(ev.data ?? "");
         break;
       }
       case "files.changed":
@@ -381,9 +387,51 @@ function connect() {
   sock.on("replay", (bundle) => {
     resetTranscript();
     if (bundle?.chat?.length) {
-      for (const c of bundle.chat) append({ kind: "user", who: c.user_id, text: c.text });
+      for (const c of bundle.chat) {
+        if (c.user_id === "agent") {
+          // Stored as JSON array of token chunks; replay through the same
+          // dispatcher used live so tool tiles and markdown both come back.
+          let chunks = null;
+          try { chunks = JSON.parse(c.text); } catch { chunks = null; }
+          if (Array.isArray(chunks)) {
+            startAssistantBubble();
+            for (const chunk of chunks) dispatchAgentChunk(String(chunk));
+            finishAssistantBubble();
+          } else {
+            append({ kind: "assistant", who: "assistant", text: c.text });
+          }
+        } else {
+          append({ kind: "user", who: c.user_id, text: c.text });
+        }
+      }
     }
   });
+}
+
+// Shared between live agent.token handling and replay of stored assistant
+// rows. Knows about the markers the daemon embeds in the token stream:
+// [tool_use:…], [tool_result:…], [checkpoint …], [done], plus the legacy
+// [edit …] / [cmd …] / [tool …] strings emitted by the scripted agent.
+function dispatchAgentChunk(t) {
+  if (!t) return;
+  if (t.startsWith("[checkpoint")) {
+    appendSystem(t);
+    finishAssistantBubble();
+  } else if (t === "[done]") {
+    finishAssistantBubble();
+  } else if (t.startsWith("[tool_use:")) {
+    appendToolUse(t);
+  } else if (t.startsWith("[tool_result:")) {
+    appendToolResult(t);
+  } else if (
+    t.startsWith("[edit ") ||
+    t.startsWith("[cmd ") ||
+    t.startsWith("[tool ")
+  ) {
+    appendSystem(t);
+  } else {
+    appendToAssistant(t);
+  }
 }
 
 function isCurrentChatEvent(ev) {
@@ -454,30 +502,67 @@ function handleFilesChanged(changes) {
   }
 }
 
+// Group the flat path list from /api/files into nested Folder + File objects
+// for @webreflection/file-tree. Folders show with the disclosure triangle and
+// folders are kept sorted; the component handles open/close + keyboard nav.
+function buildFileTree(files) {
+  const folders = new Map(); // posix path -> Folder
+  const roots = [];
+  const folderAt = (path, name) => {
+    let f = folders.get(path);
+    if (!f) {
+      f = new FtFolder(name);
+      folders.set(path, f);
+    }
+    return f;
+  };
+  for (const f of files) {
+    const parts = f.path.split("/");
+    const name = parts.pop();
+    let parent = null;
+    let prefix = "";
+    for (const part of parts) {
+      prefix = prefix ? `${prefix}/${part}` : part;
+      const existing = folders.has(prefix);
+      const folder = folderAt(prefix, part);
+      if (!existing) {
+        if (parent) parent.append(folder);
+        else roots.push(folder);
+      }
+      parent = folder;
+    }
+    // file-tree derives the displayed byte count from the actual Blob size,
+    // so pass a zero-filled buffer of the right size (clamped to keep huge
+    // files from inflating the UI's memory footprint).
+    const bytes = Math.max(0, Math.min(f.size ?? 0, 16 * 1024 * 1024));
+    const file = new FtFile([new Uint8Array(bytes)], name);
+    if (parent) parent.append(file);
+    else roots.push(file);
+  }
+  return roots;
+}
+
+let fileTreeEl = null;
+
 function renderFiles(files) {
   els.fileList.innerHTML = "";
   if (files.length === 0) {
     els.fileList.innerHTML = `<div class="empty" style="padding:10px 12px;color:#6c7280;font-style:italic;">no visible files</div>`;
+    fileTreeEl = null;
     return;
   }
-  for (const f of files) {
-    const row = document.createElement("div");
-    row.className = "file-row" + (f.path === currentFile ? " active" : "");
-    row.dataset.path = f.path;
-    row.innerHTML =
-      `<span class="mode">${f.mode}</span>` +
-      `<span class="size">${fmtSize(f.size)}</span>` +
-      escapeHtml(f.path);
-    row.addEventListener("click", () => loadFile(f.path));
-    els.fileList.appendChild(row);
-  }
+  fileTreeEl = document.createElement("file-tree");
+  els.fileList.appendChild(fileTreeEl);
+  fileTreeEl.append(...buildFileTree(files));
+  fileTreeEl.addEventListener("click", (e) => {
+    const detail = e.detail;
+    if (!detail || detail.folder) return; // folder clicks toggle open/close
+    loadFile(detail.path);
+  });
 }
 
 async function loadFile(path) {
   currentFile = path;
-  for (const row of els.fileList.querySelectorAll(".file-row")) {
-    row.classList.toggle("active", row.dataset.path === path);
-  }
   els.viewerPath.textContent = path;
   els.viewerBody.innerHTML = `<div class="empty">loading…</div>`;
   try {
