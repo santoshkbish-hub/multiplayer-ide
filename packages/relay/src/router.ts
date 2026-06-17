@@ -120,6 +120,15 @@ export function attachHandlers(io: Server, state: RouterState): void {
       online: true,
     });
     socket.on("disconnect", () => {
+      // Notify daemon so it can update its live-connection tracker for this
+      // session and arm the idle teardown timer once the last socket leaves.
+      if (state.daemonSocket) {
+        state.daemonSocket.emit("client.bye", {
+          socket_id: socket.id,
+          session_id,
+          user_id,
+        });
+      }
       io.to(session_id).emit("event", {
         type: "presence.update",
         session_id,

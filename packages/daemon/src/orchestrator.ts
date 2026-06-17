@@ -92,6 +92,11 @@ export class Orchestrator {
   private emptyFile = "";
   // user_id of the most recent invite per session (so we can revoke on delegate)
   private invitesBySession = new Map<string, Map<string, string>>();
+  // socket_ids currently connected per session, across all chats. A session is
+  // considered live iff this set is non-empty.
+  private liveSockets = new Map<string, Set<string>>();
+  // Pending idle-teardown timers, one per session with zero live sockets.
+  private idleTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(private config: DaemonConfig) {}
 
@@ -198,6 +203,7 @@ export class Orchestrator {
       this.handleEvent(ev),
     );
     this.relay.setHelloHandler((h) => this.handleHello(h));
+    this.relay.setByeHandler((b) => this.handleBye(b));
     await this.relay.connect();
 
     this.admin = new AdminServer({
@@ -216,20 +222,19 @@ export class Orchestrator {
     });
     const port = await this.admin.start();
 
-    // Rehydrate any sessions left over from a prior daemon run.
+    // Rehydrate any sessions left over from a prior daemon run. We only restore
+    // worktree metadata + relay room membership; containers and file watchers
+    // are created lazily when the first client socket connects (see
+    // attachClient). A freshly-booted daemon has zero live sockets, so any row
+    // previously marked "active" is demoted to "inactive" — it will flip back
+    // to active when a client reconnects.
     const reh = new FixedRehydrator(this.sessions, this.gm, this.config.repoRoot);
     const report = reh.rehydrateActive();
+    const now = new Date().toISOString();
     for (const s of report.rehydrated) {
       this.relay.join(s.session_id);
-      if (s.worktree_path) {
-        if (this.config.createContainers) {
-          const plan = this.resolver.resolveMountPlan(s.worktree_path, s.policy, {
-            emptyFileHost: this.emptyFile,
-            gitMetadataHost: this.gm.absoluteGitDir(this.config.repoRoot),
-          });
-          await this.podman.create(s.session_id, plan);
-        }
-        this.watcher.watchSession(s.session_id, s.worktree_path, s.policy);
+      if (s.status === "active") {
+        this.sessions.setStatus(s.session_id, "inactive", now);
       }
     }
 
@@ -237,6 +242,9 @@ export class Orchestrator {
   }
 
   async stop(): Promise<void> {
+    for (const t of this.idleTimers.values()) clearTimeout(t);
+    this.idleTimers.clear();
+    this.liveSockets.clear();
     this.watcher?.stopAll();
     await this.admin?.stop();
     await this.relay?.close();
@@ -269,6 +277,9 @@ export class Orchestrator {
 
     this.relay.join(s.session_id);
     this.watcher.watchSession(s.session_id, wt, policy);
+    // Arm an idle timer so a session created via /api/join whose WS never
+    // arrives (browser crash, network blip) doesn't leak a container.
+    this.armIdleTimer(s.session_id);
     return { session_id: s.session_id, branch_name: s.branch_name, worktree_path: wt };
   }
 
@@ -473,6 +484,12 @@ export class Orchestrator {
     input: EndSessionInput,
   ): Promise<{ ok: true }> {
     const reason = input.reason ?? "ended";
+    const timer = this.idleTimers.get(sessionId);
+    if (timer) {
+      clearTimeout(timer);
+      this.idleTimers.delete(sessionId);
+    }
+    this.liveSockets.delete(sessionId);
     this.watcher.unwatch(sessionId);
     this.sm.endSession(sessionId, reason);
     if (this.config.createContainers) {
@@ -554,11 +571,101 @@ export class Orchestrator {
   }
 
   private handleHello(h: import("./relayClient.js").ClientHello): void {
+    void this.attachClient(h.session_id, h.socket_id);
     const bundle = this.replay.bundle(h.session_id, {
       ...(h.since_chat_seq !== undefined ? { chat_seq: h.since_chat_seq } : {}),
       ...(h.since_event_seq !== undefined ? { event_seq: h.since_event_seq } : {}),
     }, h.chat_id ?? "default");
     this.relay.sendReplay(h.socket_id, bundle);
+  }
+
+  private handleBye(b: import("./relayClient.js").ClientBye): void {
+    this.detachClient(b.session_id, b.socket_id);
+  }
+
+  // Add a client socket to the session's live set. If this is the first socket
+  // for the session, cancel any pending idle teardown and lazily materialize
+  // the per-session container + file watcher.
+  private async attachClient(sessionId: string, socketId: string): Promise<void> {
+    const s = this.sm.getSession(sessionId);
+    if (!s || s.status === "ended") return;
+    let set = this.liveSockets.get(sessionId);
+    if (!set) {
+      set = new Set();
+      this.liveSockets.set(sessionId, set);
+    }
+    const wasEmpty = set.size === 0;
+    set.add(socketId);
+    const timer = this.idleTimers.get(sessionId);
+    if (timer) {
+      clearTimeout(timer);
+      this.idleTimers.delete(sessionId);
+    }
+    if (!wasEmpty) return;
+    if (s.status !== "active") {
+      this.sessions.setStatus(sessionId, "active", new Date().toISOString());
+    }
+    if (!s.worktree_path) return;
+    if (this.config.createContainers && !this.podman.has(sessionId)) {
+      const plan = this.resolver.resolveMountPlan(s.worktree_path, s.policy, {
+        emptyFileHost: this.emptyFile,
+        gitMetadataHost: this.gm.absoluteGitDir(this.config.repoRoot),
+      });
+      try {
+        await this.podman.create(sessionId, plan);
+      } catch (e) {
+        this.relay.emit({
+          type: "error",
+          session_id: sessionId,
+          code: "container_create_failed",
+          message: (e as Error).message,
+        } satisfies ErrorEvent);
+        return;
+      }
+    }
+    if (!this.watcher.isWatching(sessionId)) {
+      this.watcher.watchSession(sessionId, s.worktree_path, s.policy);
+    }
+  }
+
+  // Remove a client socket. If the session is now empty, arm the idle timer.
+  private detachClient(sessionId: string, socketId: string): void {
+    const set = this.liveSockets.get(sessionId);
+    if (!set) return;
+    set.delete(socketId);
+    if (set.size > 0) return;
+    this.liveSockets.delete(sessionId);
+    this.armIdleTimer(sessionId);
+  }
+
+  private armIdleTimer(sessionId: string): void {
+    const prior = this.idleTimers.get(sessionId);
+    if (prior) clearTimeout(prior);
+    const t = setTimeout(() => {
+      this.idleTimers.delete(sessionId);
+      void this.runIdle(sessionId);
+    }, this.config.idleMs);
+    // Don't hold the event loop open just for the teardown.
+    if (typeof t.unref === "function") t.unref();
+    this.idleTimers.set(sessionId, t);
+  }
+
+  // Fired when the idle timer elapses with zero live sockets — tear down the
+  // container + watcher and mark the session inactive. Session row is kept so
+  // a future client can re-attach.
+  private async runIdle(sessionId: string): Promise<void> {
+    if ((this.liveSockets.get(sessionId)?.size ?? 0) > 0) return;
+    const s = this.sm.getSession(sessionId);
+    if (!s || s.status === "ended") return;
+    this.watcher.unwatch(sessionId);
+    if (this.config.createContainers) {
+      try {
+        await this.podman.destroy(sessionId);
+      } catch {
+        // best-effort; container may already be gone
+      }
+    }
+    this.sessions.setStatus(sessionId, "inactive", new Date().toISOString());
   }
 
   private async handleEvent(ev: ForwardedEvent): Promise<void> {

@@ -18,6 +18,9 @@ export interface DaemonConfig {
   agent: AgentKind;
   agentModel?: string;
   agentSystemPrompt?: string;
+  // Idle timeout (ms) before a session with zero live client sockets has its
+  // container destroyed. Default 5 min.
+  idleMs: number;
 }
 
 export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
@@ -47,6 +50,7 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): DaemonC
     ...(env.COLLAB_AGENT_SYSTEM_PROMPT
       ? { agentSystemPrompt: env.COLLAB_AGENT_SYSTEM_PROMPT }
       : {}),
+    idleMs: Number(env.COLLAB_IDLE_MS ?? 5 * 60 * 1000),
   };
 }
 

@@ -103,6 +103,10 @@ export class PodmanContainerManager implements ContainerManager {
     spawnSync("podman", ["rm", "-f", name], { encoding: "utf8" });
     this.created.delete(sessionId);
   }
+
+  has(sessionId: string): boolean {
+    return this.created.has(sessionId);
+  }
 }
 
 async function* iterChunks(child: ReturnType<typeof spawn>): AsyncIterable<ExecChunk> {

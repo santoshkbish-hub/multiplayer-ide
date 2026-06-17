@@ -15,6 +15,13 @@ export interface ClientHello {
 }
 export type HelloHandler = (h: ClientHello) => void | Promise<void>;
 
+export interface ClientBye {
+  socket_id: string;
+  session_id: string;
+  user_id: string;
+}
+export type ByeHandler = (b: ClientBye) => void | Promise<void>;
+
 export interface InviteRegistration {
   token: string;
   claims: { session_id: string; user_id: string; role: "owner" | "reader" };
@@ -25,6 +32,7 @@ export class RelayClient {
   private joined = new Set<string>();
   private pendingInvites: InviteRegistration[] = [];
   private onHello: HelloHandler | null = null;
+  private onBye: ByeHandler | null = null;
 
   constructor(
     private url: string,
@@ -34,6 +42,10 @@ export class RelayClient {
 
   setHelloHandler(h: HelloHandler): void {
     this.onHello = h;
+  }
+
+  setByeHandler(h: ByeHandler): void {
+    this.onBye = h;
   }
 
   sendReplay(targetSocketId: string, bundle: unknown): void {
@@ -67,6 +79,11 @@ export class RelayClient {
     sock.on("client.hello", (h: ClientHello) => {
       if (!this.onHello) return;
       void Promise.resolve(this.onHello(h)).catch(() => undefined);
+    });
+
+    sock.on("client.bye", (b: ClientBye) => {
+      if (!this.onBye) return;
+      void Promise.resolve(this.onBye(b)).catch(() => undefined);
     });
 
     sock.io.on("reconnect", () => {

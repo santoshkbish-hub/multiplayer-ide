@@ -89,6 +89,10 @@ export class FileWatcher {
     );
   }
 
+  isWatching(sessionId: string): boolean {
+    return this.watchers.has(sessionId);
+  }
+
   unwatch(sessionId: string): void {
     this.watchers.get(sessionId)?.close();
     this.watchers.delete(sessionId);

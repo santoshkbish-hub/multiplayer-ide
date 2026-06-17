@@ -127,6 +127,7 @@ describe("end-to-end orchestrator", () => {
       containerImage: DEFAULT_CONTAINER_IMAGE,
       createContainers: false, // keep e2e fast; container live tests cover the boundary
       agent: "scripted", // tests use the deterministic scripted runner, not the SDK
+      idleMs: 60 * 60 * 1000, // 1h — disable idle teardown for the duration of e2e
     };
     orch = new Orchestrator(config);
     const r = await orch.start();
