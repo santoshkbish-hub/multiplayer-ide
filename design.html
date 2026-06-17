@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Collaborative Local AI Coding — Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EBEEF2;
+    --surface:#FBFCFD;
+    --ink:#15212B;
+    --muted:#5A6A77;
+    --line:#D2DAE1;
+    --accent:#0E8C86;
+    --accent-deep:#0B6E6B;
+    --accent-tint:#E3F2F1;
+    --guard:#B5710A;
+    --guard-tint:#F6ECD9;
+    --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --disp:"Space Grotesk",system-ui,sans-serif;
+    --body:"Inter",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;
+    background-color:var(--paper);
+    background-image:radial-gradient(var(--line) 0.6px, transparent 0.6px);
+    background-size:22px 22px;
+    color:var(--ink);
+    font-family:var(--body);
+    line-height:1.62;
+    font-size:16px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:64px 28px 96px;}
+
+  /* header */
+  header{margin-bottom:64px;}
+  .eyebrow{
+    font-family:var(--mono);font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--accent-deep);margin:0 0 18px;
+  }
+  h1{
+    font-family:var(--disp);font-weight:600;letter-spacing:-.02em;
+    font-size:clamp(2rem,4.6vw,3.1rem);line-height:1.04;margin:0 0 20px;max-width:18ch;
+  }
+  .thesis{font-size:clamp(1rem,1.7vw,1.18rem);color:var(--muted);max-width:60ch;margin:0;}
+  .thesis b{color:var(--ink);font-weight:600;}
+
+  /* section scaffolding */
+  section{margin-top:72px;}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:24px;
+    border-top:1px solid var(--line);padding-top:18px;}
+  .sec-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--accent-deep);white-space:nowrap;padding-top:.32em;}
+  .sec-head h2{font-family:var(--disp);font-weight:500;font-size:1.45rem;letter-spacing:-.01em;margin:0;}
+
+  p.lead{color:var(--muted);max-width:66ch;margin:0 0 8px;}
+  .ink{color:var(--ink);font-weight:500;}
+
+  /* principle list */
+  .principles{display:grid;gap:14px;margin:6px 0 0;padding:0;list-style:none;max-width:72ch;}
+  .principles li{position:relative;padding-left:26px;color:var(--ink);}
+  .principles li::before{content:"";position:absolute;left:2px;top:.62em;width:11px;height:1.5px;background:var(--accent);}
+  .principles li span{color:var(--muted);}
+
+  /* diagram surface */
+  .canvas{
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:22px;margin-top:8px;box-shadow:0 1px 0 rgba(21,33,43,.03),0 14px 34px -28px rgba(21,33,43,.35);
+  }
+  .canvas svg{display:block;width:100%;height:auto;}
+
+  /* SVG shared */
+  .nbox{fill:var(--surface);stroke:var(--line);stroke-width:1.4;}
+  .nbox.accent{fill:var(--accent-tint);stroke:var(--accent);}
+  .nbox.accent-soft{fill:#EFF6F6;stroke:#9FCFCC;}
+  .nbox.guard{fill:var(--guard-tint);stroke:var(--guard);}
+  .zone{fill:rgba(14,140,134,.04);stroke:var(--accent);stroke-width:1.4;stroke-dasharray:5 5;}
+  .loopbox{fill:rgba(14,140,134,.03);stroke:var(--accent);stroke-width:1.3;stroke-dasharray:5 5;}
+  .ttl{font-family:var(--mono);font-weight:500;fill:var(--ink);}
+  .ttl.acc{fill:var(--accent-deep);}
+  .ttl.gd{fill:var(--guard);}
+  .sub{font-family:var(--body);fill:var(--muted);}
+  .zlbl{font-family:var(--mono);font-weight:500;fill:var(--accent-deep);letter-spacing:.04em;}
+  .edge{fill:none;stroke:var(--ink);stroke-width:1.5;}
+  .edge-ws{fill:none;stroke:var(--muted);stroke-width:1.4;stroke-dasharray:4 4;}
+  .edge-mt{fill:none;stroke:var(--accent);stroke-width:1.6;}
+  .edge-gd{fill:none;stroke:var(--guard);stroke-width:1.6;}
+  .elbl{font-family:var(--mono);fill:var(--muted);}
+  .diamond{fill:var(--surface);stroke:var(--ink);stroke-width:1.4;}
+  .note{font-family:var(--mono);fill:var(--muted);}
+
+  /* decisions */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:8px;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px 18px;}
+  .card .tag{font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent-deep);display:inline-block;padding:3px 8px;border:1px solid var(--accent);border-radius:4px;margin-bottom:14px;}
+  .card h3{font-family:var(--disp);font-weight:500;font-size:1.02rem;margin:0 0 8px;letter-spacing:-.01em;}
+  .card p{margin:0;color:var(--muted);font-size:.93rem;line-height:1.55;}
+  .card code{font-family:var(--mono);font-size:.84em;color:var(--ink);background:var(--accent-tint);padding:1px 5px;border-radius:4px;}
+
+  /* mount legend */
+  .mount{display:grid;grid-template-columns:auto 1fr;gap:0;max-width:560px;margin-top:22px;
+    border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);}
+  .mount div{padding:12px 16px;border-top:1px solid var(--line);}
+  .mount .h{border-top:none;}
+  .mount .k{font-family:var(--mono);font-size:.85rem;color:var(--ink);font-weight:500;border-right:1px solid var(--line);}
+  .mount .v{font-size:.9rem;color:var(--muted);}
+  .mount .h.k,.mount .h.v{font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-deep);}
+
+  /* relay */
+  .relay-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:32px;align-items:start;}
+  .relay-grid p{margin:0 0 14px;}
+  .owns{display:grid;gap:18px;}
+  .owns h4{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;margin:0 0 8px;color:var(--accent-deep);}
+  .owns.deny h4{color:var(--guard);}
+  .owns ul{margin:0;padding:0;list-style:none;display:grid;gap:6px;}
+  .owns li{font-size:.92rem;color:var(--muted);padding-left:18px;position:relative;}
+  .owns li::before{content:"+";position:absolute;left:0;color:var(--accent);font-family:var(--mono);}
+  .owns.deny li::before{content:"\2212";color:var(--guard);}
+  .conn{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;margin-top:8px;}
+  .relay-lead{max-width:78ch;margin:0 0 14px;}
+  .relay-cols{display:grid;grid-template-columns:1.45fr 1fr;gap:24px;margin-top:24px;align-items:start;}
+  .callout{background:var(--guard-tint);border:1px solid var(--guard);border-radius:10px;padding:18px 20px;}
+  .callout h4{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--guard);margin:0 0 10px;}
+  .callout p{margin:0 0 10px;font-size:.92rem;color:var(--ink);line-height:1.55;}
+  .callout p:last-child{margin:0;color:var(--muted);}
+
+  footer{margin-top:84px;border-top:1px solid var(--line);padding-top:22px;
+    font-family:var(--mono);font-size:.74rem;color:var(--muted);letter-spacing:.04em;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+
+  .reveal{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease;}
+  .reveal.in{opacity:1;transform:none;}
+
+  @media (max-width:760px){
+    .wrap{padding:44px 18px 72px;}
+    .cards{grid-template-columns:1fr;}
+    .relay-grid{grid-template-columns:1fr;gap:22px;}
+    .relay-cols{grid-template-columns:1fr;gap:18px;}
+    .sec-head{flex-direction:column;gap:4px;}
+  }
+  @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="reveal">
+    <p class="eyebrow">Local-first · Collaborative coding · Prototype</p>
+    <h1>Collaborative Local AI Coding</h1>
+    <p class="thesis">The host laptop is the <b>source of truth</b>. Remote collaborators connect through a thin relay; the <b>host app</b> manages shared workspaces, agent runs, safety boundaries, and every publish to main.</p>
+  </header>
+
+  <!-- OVERVIEW -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-tag">Overview</span><h2>How it fits together</h2></div>
+    <ul class="principles">
+      <li>A work session is the shared workspace: <span>one file tree, one draft of work, and one safe place for agents to run.</span> Multiple conversations can collaborate inside it.</li>
+      <li>A conversation is the user-facing chat lane: <span>it has its own transcript and agent memory, but it can still work in the same shared workspace.</span></li>
+      <li>Clients never touch the host repo or terminal directly. <span>The relay carries messages; the host app decides what can run and what can change.</span></li>
+      <li>Agents stay aware of each other through short activity updates and host-provided change notices, so they can see when another agent may affect the same files.</li>
+      <li>Publishing is a gated step: <span>the host checks the changes, protects main, and serializes final merges.</span></li>
+    </ul>
+  </section>
+
+  <!-- ARCHITECTURE -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-tag">Architecture</span><h2>Components &amp; trust boundary</h2></div>
+    <div class="canvas">
+      <svg viewBox="0 0 1000 540" role="img" aria-label="Architecture diagram">
+        <defs>
+          <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#15212B"/></marker>
+          <marker id="art" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0E8C86"/></marker>
+          <marker id="art2" markerWidth="9" markerHeight="9" refX="0" refY="3" orient="auto"><path d="M7,0 L0,3 L7,6 Z" fill="#0E8C86"/></marker>
+          <marker id="arg" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#B5710A"/></marker>
+        </defs>
+
+        <!-- clients -->
+        <text class="zlbl" x="28" y="120" font-size="12">REMOTE CLIENTS</text>
+        <g>
+          <rect class="nbox accent" x="28" y="150" width="150" height="44" rx="5"/>
+          <text class="ttl acc" x="103" y="170" font-size="12" text-anchor="middle">workspace A</text>
+          <text class="sub" x="103" y="184" font-size="9.5" text-anchor="middle">conversation 1</text>
+          <rect class="nbox" x="28" y="234" width="150" height="44" rx="5"/>
+          <text class="ttl" x="103" y="254" font-size="12" text-anchor="middle">workspace A</text>
+          <text class="sub" x="103" y="268" font-size="9.5" text-anchor="middle">conversation 2</text>
+          <rect class="nbox accent" x="28" y="318" width="150" height="44" rx="5"/>
+          <text class="ttl acc" x="103" y="338" font-size="12" text-anchor="middle">workspace B</text>
+          <text class="sub" x="103" y="352" font-size="9.5" text-anchor="middle">parallel work</text>
+        </g>
+
+        <!-- relay -->
+        <rect class="nbox" x="250" y="206" width="160" height="120" rx="7"/>
+        <text class="ttl acc" x="330" y="246" font-size="16" text-anchor="middle">RELAY</text>
+        <text class="sub" x="330" y="268" font-size="10.5" text-anchor="middle">live connection</text>
+        <text class="sub" x="330" y="284" font-size="10.5" text-anchor="middle">presence · routing</text>
+        <text class="sub" x="330" y="306" font-size="10.5" text-anchor="middle" font-style="italic">no repo access</text>
+
+        <!-- client -> relay -->
+        <path class="edge-ws" d="M178,172 L250,250" marker-end="url(#ar)" opacity="0.55"/>
+        <path class="edge-ws" d="M178,256 L250,266" marker-end="url(#ar)" opacity="0.55"/>
+        <path class="edge-ws" d="M178,340 L250,282" marker-end="url(#ar)" opacity="0.55"/>
+
+        <!-- host boundary -->
+        <rect class="zone" x="500" y="70" width="476" height="448" rx="12"/>
+        <text class="zlbl" x="518" y="92" font-size="12">HOST LAPTOP — trusted · local</text>
+
+        <!-- relay -> host -->
+        <path class="edge-ws" d="M410,250 L520,128" marker-end="url(#ar)"/>
+        <text class="elbl" x="430" y="178" font-size="10" transform="rotate(-25 430 178)">live events</text>
+
+        <!-- host controller -->
+        <rect class="nbox accent" x="520" y="104" width="436" height="54" rx="6"/>
+        <text class="ttl acc" x="738" y="126" font-size="13" text-anchor="middle">HOST APP / CONTROLLER</text>
+        <text class="sub" x="738" y="143" font-size="10" text-anchor="middle">workspaces · conversations · agents · safety · publish</text>
+
+        <!-- parallel session stack (ghosts behind) -->
+        <rect class="nbox" x="534" y="204" width="204" height="220" rx="6" opacity="0.3"/>
+        <rect class="nbox" x="527" y="197" width="204" height="220" rx="6" opacity="0.55"/>
+
+        <!-- workspace -->
+        <rect class="nbox" x="520" y="190" width="204" height="64" rx="6"/>
+        <text class="ttl" x="622" y="216" font-size="12" text-anchor="middle">SHARED WORKSPACE</text>
+        <text class="sub" x="622" y="234" font-size="10" text-anchor="middle">files + draft for one work session</text>
+
+        <!-- sandbox -->
+        <rect class="nbox accent-soft" x="520" y="286" width="204" height="124" rx="6"/>
+        <text class="ttl" x="622" y="312" font-size="13" text-anchor="middle">AGENT SANDBOX</text>
+        <text class="sub" x="622" y="333" font-size="10.5" text-anchor="middle">safe file + command access</text>
+        <text class="sub" x="622" y="350" font-size="10.5" text-anchor="middle">same files for all conversations</text>
+        <text class="sub" x="622" y="367" font-size="10.5" text-anchor="middle">isolated from host secrets</text>
+        <text class="sub" x="622" y="392" font-size="10.5" text-anchor="middle" font-style="italic">agent can inspect history when needed</text>
+
+        <!-- merge manager -->
+        <rect class="nbox accent" x="752" y="190" width="204" height="64" rx="6"/>
+        <text class="ttl acc" x="854" y="216" font-size="12.5" text-anchor="middle">PUBLISH GATE</text>
+        <text class="sub" x="854" y="234" font-size="10" text-anchor="middle">review changes · run checks</text>
+
+        <!-- main -->
+        <rect class="nbox guard" x="752" y="286" width="204" height="124" rx="6"/>
+        <text class="ttl gd" x="868" y="318" font-size="12.5" text-anchor="middle">MAIN</text>
+        <rect x="812" y="308" width="13" height="11" rx="2" fill="none" stroke="#B5710A" stroke-width="1.4"/>
+        <path d="M815,308 v-3 a3,3 0 0 1 6,0 v3" fill="none" stroke="#B5710A" stroke-width="1.4"/>
+        <text class="sub" x="854" y="344" font-size="10.5" text-anchor="middle">source of truth</text>
+        <text class="sub" x="854" y="361" font-size="10.5" text-anchor="middle">only changed through publish</text>
+
+        <!-- internal edges -->
+        <path class="edge" d="M600,158 L600,190" marker-end="url(#ar)"/>
+        <text class="elbl" x="606" y="178" font-size="9.5">prepare</text>
+        <path class="edge" d="M880,158 L880,190" marker-end="url(#ar)"/>
+        <text class="elbl" x="886" y="178" font-size="9.5">protect</text>
+
+        <!-- workspace <-> sandbox access -->
+        <path class="edge-mt" d="M600,286 L600,254" marker-end="url(#art)"/>
+        <path class="edge-mt" d="M644,254 L644,286" marker-end="url(#art2)"/>
+        <text class="elbl" x="612" y="274" font-size="9.5" fill="#0B6E6B">workspace access</text>
+
+        <!-- publish -->
+        <path class="edge" d="M724,222 L752,222" marker-end="url(#ar)"/>
+        <text class="elbl" x="730" y="214" font-size="9.5">publish</text>
+
+        <!-- merge to main -->
+        <path class="edge-gd" d="M854,254 L854,286" marker-end="url(#arg)"/>
+        <text class="elbl" x="860" y="274" font-size="9.5" fill="#B5710A">merge</text>
+
+        <!-- inner notes -->
+        <text class="note" x="738" y="434" font-size="10.5" text-anchor="middle">Many work sessions can run in parallel · multiple conversations can share one workspace</text>
+        <text class="note" x="738" y="454" font-size="10.5" text-anchor="middle">Agents stay aware through activity updates · main is protected by the publish gate</text>
+
+        <!-- legend -->
+        <g transform="translate(28,470)">
+          <line class="edge" x1="0" y1="0" x2="26" y2="0" marker-end="url(#ar)"/><text class="elbl" x="34" y="3" font-size="10">control / data</text>
+          <line class="edge-ws" x1="150" y1="0" x2="176" y2="0"/><text class="elbl" x="184" y="3" font-size="10">live transport</text>
+          <line class="edge-mt" x1="280" y1="0" x2="306" y2="0"/><text class="elbl" x="314" y="3" font-size="10">workspace access</text>
+          <line class="edge-gd" x1="380" y1="0" x2="406" y2="0"/><text class="elbl" x="414" y="3" font-size="10">publish to main</text>
+        </g>
+      </svg>
+    </div>
+  </section>
+
+  <!-- SHARED SESSIONS -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-tag">Shared workspaces</span><h2>Multiple agents in one workspace</h2></div>
+    <p class="lead">The UI shows active work sessions. A user can resume an existing conversation or start another conversation inside the same workspace. Every agent sees the same file tree, so the product keeps each conversation aware of nearby work.</p>
+
+    <div class="cards">
+      <div class="card">
+        <span class="tag">workspace</span>
+        <h3>Shared working state</h3>
+        <p>One work session has one file tree and one draft of work. When several conversations join it, they are collaborating in the same place, not in copies.</p>
+      </div>
+      <div class="card">
+        <span class="tag">conversation</span>
+        <h3>Separate chat context</h3>
+        <p>Each conversation keeps its own transcript and agent memory. Starting another conversation does not create another workspace.</p>
+      </div>
+      <div class="card">
+        <span class="tag">awareness</span>
+        <h3>Coordination, not polling</h3>
+        <p>Agents receive short updates about what others are doing and what changed on main. They can add their own concise updates before important edits.</p>
+      </div>
+    </div>
+
+    <div class="canvas" style="margin-top:24px;">
+      <svg viewBox="0 0 1000 430" role="img" aria-label="Shared workspace collaboration model">
+        <defs>
+          <marker id="sa" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#15212B"/></marker>
+          <marker id="sat" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0E8C86"/></marker>
+          <marker id="sag" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#B5710A"/></marker>
+        </defs>
+
+        <!-- conversations -->
+        <text class="zlbl" x="34" y="56" font-size="11">CONVERSATIONS</text>
+        <rect class="nbox accent" x="34" y="84" width="190" height="58" rx="6"/>
+        <text class="ttl acc" x="129" y="108" font-size="12" text-anchor="middle">conversation A</text>
+        <text class="sub" x="129" y="126" font-size="10" text-anchor="middle">own transcript</text>
+        <rect class="nbox" x="34" y="176" width="190" height="58" rx="6"/>
+        <text class="ttl" x="129" y="200" font-size="12" text-anchor="middle">conversation B</text>
+        <text class="sub" x="129" y="218" font-size="10" text-anchor="middle">own agent memory</text>
+        <rect class="nbox" x="34" y="268" width="190" height="58" rx="6"/>
+        <text class="ttl" x="129" y="292" font-size="12" text-anchor="middle">conversation C</text>
+        <text class="sub" x="129" y="310" font-size="10" text-anchor="middle">same workspace</text>
+
+        <!-- shared workspace -->
+        <rect class="zone" x="304" y="54" width="320" height="292" rx="12"/>
+        <text class="zlbl" x="324" y="78" font-size="11">ONE SHARED WORKSPACE</text>
+        <rect class="nbox" x="334" y="104" width="260" height="58" rx="6"/>
+        <text class="ttl" x="464" y="128" font-size="12" text-anchor="middle">working draft</text>
+        <text class="sub" x="464" y="146" font-size="10" text-anchor="middle">local draft of changes</text>
+        <rect class="nbox accent-soft" x="334" y="192" width="260" height="62" rx="6"/>
+        <text class="ttl" x="464" y="216" font-size="12" text-anchor="middle">file tree</text>
+        <text class="sub" x="464" y="234" font-size="10" text-anchor="middle">same files for every conversation</text>
+        <rect class="nbox accent-soft" x="334" y="284" width="260" height="38" rx="6"/>
+        <text class="ttl" x="464" y="307" font-size="12" text-anchor="middle">safe agent runtime</text>
+
+        <!-- context -->
+        <rect class="nbox" x="704" y="72" width="236" height="74" rx="6"/>
+        <text class="ttl acc" x="822" y="100" font-size="12" text-anchor="middle">latest activity</text>
+        <text class="sub" x="822" y="120" font-size="10" text-anchor="middle">who is editing what</text>
+        <rect class="nbox accent" x="704" y="178" width="236" height="74" rx="6"/>
+        <text class="ttl acc" x="822" y="206" font-size="12" text-anchor="middle">agent updates</text>
+        <text class="sub" x="822" y="226" font-size="10" text-anchor="middle">short plans and blockers</text>
+        <rect class="nbox guard" x="704" y="284" width="236" height="62" rx="6"/>
+        <text class="ttl gd" x="822" y="309" font-size="12" text-anchor="middle">main changed</text>
+        <text class="sub" x="822" y="328" font-size="10" text-anchor="middle">possible overlaps highlighted</text>
+
+        <!-- arrows chats to session -->
+        <path class="edge" d="M224,113 L334,133" marker-end="url(#sa)"/>
+        <path class="edge" d="M224,205 L334,223" marker-end="url(#sa)"/>
+        <path class="edge" d="M224,297 L334,303" marker-end="url(#sa)"/>
+        <text class="elbl" x="252" y="176" font-size="10" text-anchor="middle">all agent work lands here</text>
+
+        <!-- context arrows -->
+        <path class="edge-mt" d="M624,133 L704,109" marker-end="url(#sat)"/>
+        <path class="edge-mt" d="M624,223 L704,215" marker-end="url(#sat)"/>
+        <path class="edge-gd" d="M624,303 L704,315" marker-end="url(#sag)"/>
+        <path class="edge-mt" d="M704,215 C620,376 304,374 166,326" marker-end="url(#sat)" opacity="0.65"/>
+        <text class="elbl" x="500" y="382" font-size="10" text-anchor="middle" fill="#0B6E6B">fresh awareness returns to each conversation</text>
+
+        <text class="note" x="500" y="406" font-size="10.5" text-anchor="middle">The agent sees enough shared context to avoid duplicate work, then can inspect details only when relevant.</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- FLOW -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-tag">Flow</span><h2>How work moves through the system</h2></div>
+    <div class="canvas">
+      <svg viewBox="0 0 620 1185" role="img" aria-label="End-to-end flowchart">
+        <defs>
+          <marker id="fa" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#15212B"/></marker>
+          <marker id="fag" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#B5710A"/></marker>
+          <marker id="faa" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0E8C86"/></marker>
+        </defs>
+
+        <!-- N1 -->
+        <rect class="nbox" x="160" y="24" width="300" height="46" rx="6"/>
+        <text class="ttl" x="310" y="52" font-size="13" text-anchor="middle">User chooses workspace + conversation</text>
+        <path class="edge" d="M310,70 L310,98" marker-end="url(#fa)"/>
+
+        <!-- N2 -->
+        <rect class="nbox" x="160" y="98" width="300" height="56" rx="6"/>
+        <text class="ttl" x="310" y="122" font-size="12.5" text-anchor="middle">Relay connects the browser</text>
+        <text class="sub" x="310" y="140" font-size="10" text-anchor="middle">live messages, presence, reconnect</text>
+        <path class="edge" d="M310,154 L310,184" marker-end="url(#fa)"/>
+
+        <!-- N3 -->
+        <rect class="nbox" x="160" y="184" width="300" height="46" rx="6"/>
+        <text class="ttl" x="310" y="212" font-size="13" text-anchor="middle">User asks the agent to make a change</text>
+        <path class="edge" d="M310,230 L310,258" marker-end="url(#fa)"/>
+
+        <!-- N4 -->
+        <rect class="nbox accent" x="160" y="258" width="300" height="48" rx="6"/>
+        <text class="ttl acc" x="310" y="287" font-size="12.5" text-anchor="middle">Host app approves the request</text>
+        <path class="edge" d="M310,306 L310,334" marker-end="url(#fa)"/>
+
+        <!-- N5 -->
+        <rect class="nbox accent-soft" x="160" y="334" width="300" height="58" rx="6"/>
+        <text class="ttl" x="310" y="358" font-size="12.5" text-anchor="middle">Agent opens the shared workspace</text>
+        <text class="sub" x="310" y="376" font-size="10" text-anchor="middle">same files seen by other conversations</text>
+        <path class="edge" d="M310,392 L310,430" marker-end="url(#faa)"/>
+
+        <!-- AGENT LOOP -->
+        <rect class="loopbox" x="64" y="430" width="492" height="310" rx="10"/>
+        <text class="zlbl" x="82" y="452" font-size="11">AGENT WORKFLOW — collaborate before changing files</text>
+
+        <!-- L1 -->
+        <rect class="nbox" x="160" y="468" width="300" height="48" rx="6"/>
+        <text class="ttl" x="310" y="490" font-size="12.5" text-anchor="middle">Receive latest collaboration context</text>
+        <text class="sub" x="310" y="506" font-size="9.5" text-anchor="middle">activity updates + recent main changes</text>
+        <path class="edge" d="M310,516 L310,540" marker-end="url(#fa)"/>
+
+        <!-- D1 -->
+        <polygon class="diamond" points="310,540 408,588 310,636 212,588"/>
+        <text class="ttl" x="310" y="584" font-size="11" text-anchor="middle">someone changed</text>
+        <text class="ttl" x="310" y="598" font-size="11" text-anchor="middle">nearby files?</text>
+
+        <!-- yes -> side inspect -->
+        <path class="edge" d="M408,588 L470,588" marker-end="url(#fa)"/>
+        <text class="elbl" x="430" y="582" font-size="9.5">yes</text>
+        <rect class="nbox" x="470" y="562" width="118" height="52" rx="6"/>
+        <text class="ttl" x="529" y="584" font-size="10.5" text-anchor="middle">Review /</text>
+        <text class="ttl" x="529" y="598" font-size="10.5" text-anchor="middle">adjust</text>
+        <path class="edge" d="M529,562 C529,500 480,492 462,492" marker-end="url(#fa)"/>
+
+        <!-- no down -->
+        <path class="edge" d="M310,636 L310,666" marker-end="url(#fa)"/>
+        <text class="elbl" x="318" y="656" font-size="9.5">no</text>
+
+        <!-- L2 checkpoint -->
+        <rect class="nbox" x="180" y="666" width="260" height="44" rx="6"/>
+        <text class="ttl" x="310" y="693" font-size="12.5" text-anchor="middle">Edit · test · save progress</text>
+
+        <!-- loop-back (periodic poll) -->
+        <path class="edge" d="M180,688 C96,688 96,492 158,492" marker-end="url(#fa)"/>
+        <text class="elbl" x="74" y="592" font-size="9.5" transform="rotate(-90 74 592)">repeat with fresh awareness</text>
+
+        <!-- exit loop -->
+        <path class="edge" d="M310,740 L310,768" marker-end="url(#fa)"/>
+
+        <!-- N6 publish -->
+        <rect class="nbox" x="160" y="768" width="300" height="46" rx="6"/>
+        <text class="ttl" x="310" y="796" font-size="13" text-anchor="middle">Agent asks to publish</text>
+        <path class="edge" d="M310,814 L310,842" marker-end="url(#fa)"/>
+
+        <!-- N7 merge manager -->
+        <rect class="nbox accent" x="150" y="842" width="320" height="58" rx="6"/>
+        <text class="ttl acc" x="310" y="866" font-size="12.5" text-anchor="middle">Publish gate reviews the work</text>
+        <text class="sub" x="310" y="884" font-size="10" text-anchor="middle">save latest edits · validate · run checks</text>
+        <path class="edge" d="M310,900 L310,924" marker-end="url(#fa)"/>
+
+        <!-- D2 -->
+        <polygon class="diamond" points="310,924 412,972 310,1020 208,972"/>
+        <text class="ttl" x="310" y="968" font-size="11" text-anchor="middle">safe to</text>
+        <text class="ttl" x="310" y="982" font-size="11" text-anchor="middle">publish?</text>
+
+        <!-- no -> side -->
+        <path class="edge" d="M412,972 L470,972" marker-end="url(#fa)"/>
+        <text class="elbl" x="432" y="966" font-size="9.5">no</text>
+        <rect class="nbox" x="470" y="946" width="120" height="52" rx="6"/>
+        <text class="ttl" x="530" y="968" font-size="10.5" text-anchor="middle">Send back</text>
+        <text class="ttl" x="530" y="982" font-size="10.5" text-anchor="middle">for repair</text>
+        <path class="edge" d="M530,946 C530,760 556,580 556,512 L556,512" marker-end="url(#fa)" opacity="0.5"/>
+
+        <!-- yes down -->
+        <path class="edge-gd" d="M310,1020 L310,1050" marker-end="url(#fag)"/>
+        <text class="elbl" x="318" y="1040" font-size="9.5" fill="#B5710A">yes</text>
+
+        <!-- N8 merge -->
+        <rect class="nbox guard" x="180" y="1050" width="260" height="46" rx="6"/>
+        <text class="ttl gd" x="310" y="1078" font-size="13" text-anchor="middle">Merge to main</text>
+        <path class="edge" d="M310,1096 L310,1120" marker-end="url(#fa)"/>
+
+        <!-- N9 -->
+        <rect class="nbox" x="160" y="1120" width="300" height="46" rx="6"/>
+        <text class="ttl" x="310" y="1148" font-size="12.5" text-anchor="middle">Notify every conversation</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- RELAY -->
+  <section class="reveal">
+    <div class="sec-head"><span class="sec-tag">Relay</span><h2>The relay server</h2></div>
+
+    <p class="lead relay-lead">The relay is the live transport layer. Browsers connect to it from the LAN, and the host app keeps one long-lived connection open. The relay groups people by workspace, carries presence and chat events, and forwards agent updates back to the right conversations.</p>
+    <p class="lead relay-lead">The relay does not own project state. If it restarts, users reconnect and the host app restores the visible history. File access, agent actions, and publish decisions stay on the host laptop.</p>
+
+    <div class="canvas">
+      <svg viewBox="0 0 1000 480" role="img" aria-label="Relay connection model">
+        <defs>
+          <marker id="cxa" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#15212B"/></marker>
+          <marker id="cxt" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0E8C86"/></marker>
+        </defs>
+
+        <!-- rooms + clients -->
+        <rect class="zone" x="760" y="70" width="204" height="150" rx="10"/>
+        <text class="zlbl" x="772" y="90" font-size="10">WORKSPACE A</text>
+        <rect class="nbox accent" x="776" y="104" width="172" height="44" rx="5"/>
+        <text class="ttl acc" x="862" y="123" font-size="11" text-anchor="middle">conversation 1</text>
+        <text class="sub" x="862" y="137" font-size="9" text-anchor="middle">agent updates</text>
+        <rect class="nbox" x="776" y="160" width="172" height="44" rx="5"/>
+        <text class="ttl" x="862" y="179" font-size="11" text-anchor="middle">conversation 2</text>
+        <text class="sub" x="862" y="193" font-size="9" text-anchor="middle">file refreshes</text>
+
+        <rect class="zone" x="760" y="240" width="204" height="150" rx="10"/>
+        <text class="zlbl" x="772" y="260" font-size="10">WORKSPACE B</text>
+        <rect class="nbox accent" x="776" y="274" width="172" height="44" rx="5"/>
+        <text class="ttl acc" x="862" y="293" font-size="11" text-anchor="middle">conversation 1</text>
+        <text class="sub" x="862" y="307" font-size="9" text-anchor="middle">separate work</text>
+        <rect class="nbox" x="776" y="330" width="172" height="44" rx="5"/>
+        <text class="ttl" x="862" y="349" font-size="11" text-anchor="middle">conversation 2</text>
+        <text class="sub" x="862" y="363" font-size="9" text-anchor="middle">shared awareness</text>
+
+        <!-- relay -->
+        <rect class="nbox" x="400" y="150" width="210" height="170" rx="8"/>
+        <text class="ttl acc" x="505" y="198" font-size="18" text-anchor="middle">RELAY</text>
+        <text class="sub" x="505" y="222" font-size="11" text-anchor="middle">connection hub</text>
+        <text class="sub" x="505" y="242" font-size="10" text-anchor="middle">keeps live channels open</text>
+        <text class="sub" x="505" y="262" font-size="10" text-anchor="middle">routes workspace events</text>
+
+        <!-- SPOF badge -->
+        <rect x="518" y="137" width="98" height="26" rx="13" fill="#F6ECD9" stroke="#B5710A" stroke-width="1.3"/>
+        <text x="567" y="154" font-family="'JetBrains Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#B5710A" text-anchor="middle">&#9888; SPOF</text>
+
+        <!-- host app -->
+        <rect class="nbox accent" x="44" y="196" width="168" height="72" rx="6"/>
+        <text class="ttl acc" x="128" y="224" font-size="13" text-anchor="middle">HOST APP</text>
+        <text class="sub" x="128" y="244" font-size="10" text-anchor="middle">owns project state</text>
+        <text class="sub" x="128" y="259" font-size="9.5" text-anchor="middle">joins every workspace</text>
+
+        <!-- host -> relay (bold persistent) -->
+        <path class="edge-mt" d="M212,232 L398,232" stroke-width="2.6" marker-end="url(#cxt)"/>
+        <text class="elbl" x="305" y="224" font-size="10" text-anchor="middle" fill="#0B6E6B">one live host channel</text>
+
+        <!-- relay -> clients fan -->
+        <path class="edge-mt" d="M610,206 L772,126" marker-end="url(#cxt)"/>
+        <path class="edge-mt" d="M610,222 L772,182" marker-end="url(#cxt)"/>
+        <path class="edge-mt" d="M610,248 L772,296" marker-end="url(#cxt)"/>
+        <path class="edge-mt" d="M610,264 L772,352" marker-end="url(#cxt)"/>
+        <rect x="648" y="216" width="96" height="17" fill="#FBFCFD" opacity="0.92"/>
+        <text class="elbl" x="696" y="228" font-size="10" text-anchor="middle" fill="#0B6E6B">live browser channels</text>
+
+        <!-- handshake strip -->
+        <text class="note" x="60" y="416" font-size="10" text-anchor="start">connection path:</text>
+        <rect class="nbox" x="60" y="428" width="152" height="34" rx="5"/>
+        <text class="ttl" x="136" y="449" font-size="10.5" text-anchor="middle">&#9312; join workspace</text>
+        <path class="edge" d="M212,445 L250,445" marker-end="url(#cxa)"/>
+        <rect class="nbox" x="250" y="428" width="116" height="34" rx="5"/>
+        <text class="ttl" x="308" y="449" font-size="10.5" text-anchor="middle">&#9313; verify</text>
+        <path class="edge" d="M366,445 L404,445" marker-end="url(#cxa)"/>
+        <rect class="nbox accent-soft" x="404" y="428" width="180" height="34" rx="5"/>
+        <text class="ttl" x="494" y="449" font-size="10.5" text-anchor="middle">&#9314; live updates</text>
+        <text class="note" x="604" y="442" font-size="10" text-anchor="start">chat, presence, file updates</text>
+        <text class="note" x="604" y="457" font-size="9.5" text-anchor="start">clients reconnect and replay visible history</text>
+      </svg>
+    </div>
+
+    <div class="relay-cols">
+      <div class="callout">
+        <h4>&#9888; Single point of failure</h4>
+        <p>One relay node is exactly that — if it goes down, every workspace temporarily loses its live connection.</p>
+        <p>Tolerable for the prototype: the host keeps the project state locally and browsers reconnect when the relay returns. A production version would run redundant relay nodes so live rooms can survive one node failing.</p>
+      </div>
+      <div class="owns">
+        <div class="owns">
+          <h4>Relay owns</h4>
+          <ul>
+            <li>workspace membership</li>
+            <li>forwarding, presence, history delivery</li>
+            <li>reconnect handling</li>
+          </ul>
+        </div>
+        <div class="owns deny">
+          <h4>Relay never owns</h4>
+          <ul>
+            <li>files or commands</li>
+            <li>agent decisions</li>
+            <li>publish rights or source-of-truth state</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Collaborative Local AI Coding · architecture v1</span>
+    <span>workspace = shared files · conversation = chat lane · host = source of truth</span>
+  </footer>
+
+</div>
+<script>
+  (function(){
+    var els=document.querySelectorAll('.reveal');
+    if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in');});return;}
+    var io=new IntersectionObserver(function(en){en.forEach(function(x){if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target);}});},{threshold:0.12});
+    els.forEach(function(e){io.observe(e);});
+  })();
+</script>
+</body>
+</html>
