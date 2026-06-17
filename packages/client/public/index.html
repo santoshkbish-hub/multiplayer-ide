@@ -288,6 +288,16 @@
         flex-wrap: wrap;
       }
       #gate .err { color: #ef4444; font-size: 12px; min-height: 1em; margin: 6px 0 0; }
+      #gate .doc-links {
+        margin: 18px 0 0;
+        padding-top: 14px;
+        border-top: 1px solid #232830;
+        font-size: 12px;
+        color: #94a0b8;
+        text-align: center;
+      }
+      #gate .doc-links a { color: #94a0b8; text-decoration: none; margin: 0 4px; }
+      #gate .doc-links a:hover { color: #d8dde6; }
       .hidden { display: none !important; }
     </style>
   </head>
@@ -306,6 +316,11 @@
           <div id="sessionList"></div>
         </section>
         <p class="err" id="gateErr"></p>
+        <p class="doc-links">
+          <a href="/flows.html" target="_blank" rel="noopener">flows</a>
+          <span aria-hidden="true">·</span>
+          <a href="/design.html" target="_blank" rel="noopener">design</a>
+        </p>
       </div>
     </div>
 

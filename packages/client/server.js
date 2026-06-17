@@ -6,11 +6,19 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PUB = resolve(__dirname, "public");
+const REPO_ROOT = resolve(__dirname, "..", "..");
 const SOCKET_IO_CLIENT = resolve(
   __dirname,
   "..", "..",
   "node_modules", "socket.io-client", "dist", "socket.io.esm.min.js",
 );
+
+// Repo-root HTML documents that the client server also exposes (so the LAN
+// landing page can link to them as siblings of the IDE).
+const DOC_PAGES = new Map([
+  ["/flows.html",  resolve(REPO_ROOT, "flows.html")],
+  ["/design.html", resolve(REPO_ROOT, "design.html")],
+]);
 
 const PORT = Number(process.env.CLIENT_PORT ?? 5173);
 const ADMIN_URL = process.env.COLLAB_ADMIN_URL ?? "http://127.0.0.1:4100";
@@ -155,6 +163,8 @@ createServer(async (req, res) => {
     let filePath;
     if (pathname === "/socket.io.esm.min.js") {
       filePath = SOCKET_IO_CLIENT;
+    } else if (DOC_PAGES.has(pathname)) {
+      filePath = DOC_PAGES.get(pathname);
     } else {
       filePath = join(PUB, pathname);
       if (!filePath.startsWith(PUB)) {
